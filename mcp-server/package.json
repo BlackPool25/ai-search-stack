@@ -1,0 +1,18 @@
+{
+  "name": "ai-search-stack-mcp",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "MCP server: Exa (primary) \u2192 Tavily (fallback) \u2192 SearXNG (last resort) web/tech/academic search",
+  "scripts": {
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
