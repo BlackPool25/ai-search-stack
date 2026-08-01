@@ -1,0 +1,46 @@
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    init: true
+    ports:
+      - "127.0.0.1:8088:8088"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+      - searxng-data:/var/cache/searxng:rw
+    environment:
+      SEARXNG_BASE_URL: http://127.0.0.1:8088/
+      SEARXNG_PORT: "8088"
+      SEARXNG_SECRET: ${SEARXNG_SECRET:?set SEARXNG_SECRET in .env}
+    healthcheck:
+      test: wget -q -O /dev/null http://localhost:8088/search?q=health\&format=json
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - searxng-net
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETUID
+      - SETGID
+      - DAC_OVERRIDE
+    mem_limit: 512m
+    cpus: "1.0"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  searxng-net:
+    name: searxng-net
+    external: true
+
+volumes:
+  searxng-data:

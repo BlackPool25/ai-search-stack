@@ -1,0 +1,104 @@
+# SearXNG configuration — AI Research Search Stack
+# secret_key is injected via the SEARXNG_SECRET environment variable
+# (see docker-compose.yml). Generate one with: openssl rand -hex 32
+
+use_default_settings:
+  engines:
+    keep_only:
+      - google cse
+      - bing
+      - github
+      - npm
+      - docker hub
+      - stackoverflow
+      - arxiv
+      - crossref
+      - openalex
+
+server:
+  port: 8088
+  bind_address: '127.0.0.1'
+  secret_key: ${SEARXNG_SECRET}
+  limiter: false
+  image_proxy: false
+
+search:
+  safe_search: 0
+  default_lang: ''
+  formats:
+    - html
+    - json
+  ban_time_on_fail: 5
+
+outgoing:
+  request_timeout: 15.0
+  max_request_timeout: 20.0
+  enable_http2: true
+
+engines:
+  # ── GENERAL WEB (web_search fallback) ──────────────────────────
+  - name: google cse
+    engine: google_cse
+    shortcut: goc
+    categories: general
+    weight: 1.0
+    disabled: false
+
+  - name: bing
+    engine: bing
+    shortcut: bi
+    categories: general
+    weight: 0.5
+    disabled: false
+
+  # ── TECHNICAL (tech_search fallback) ───────────────────────────
+  - name: github
+    engine: github
+    shortcut: gh
+    categories: it
+    weight: 1.0
+    disabled: false
+
+  - name: npm
+    engine: npm
+    shortcut: npm
+    categories: it
+    weight: 0.8
+    disabled: false
+
+  - name: docker hub
+    engine: docker_hub
+    shortcut: dh
+    categories: it
+    weight: 0.4
+    disabled: false
+
+  - name: stackoverflow
+    engine: stackexchange
+    shortcut: st
+    api_site: 'stackoverflow'
+    categories: it
+    weight: 1.0
+    disabled: false
+
+  # ── ACADEMIC (academic_search fallback) ────────────────────────
+  - name: arxiv
+    engine: arxiv
+    shortcut: arx
+    categories: science
+    weight: 1.0
+    disabled: false
+
+  - name: crossref
+    engine: crossref
+    shortcut: cr
+    categories: science
+    weight: 0.8
+    disabled: false
+
+  - name: openalex
+    engine: openalex
+    shortcut: oa
+    categories: science
+    weight: 0.8
+    disabled: false
