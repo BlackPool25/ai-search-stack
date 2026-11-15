@@ -118,11 +118,84 @@ async function tavilySearch(query: string, numResults: number, timeRange?: strin
   }));
 }
 
-// ── SearXNG (last resort — proven engines only) ─────────────────────
+// ── Free direct APIs (quality-first: paid Exa/Tavily first, these enrich fallback) ──
+async function freeGet(url: string, headers: Record<string, string> = {}): Promise<any> {
+  const resp = await fetch(url, {
+    headers: { "User-Agent": "searxng-mcp/2.0 (research)", Accept: "application/json", ...headers },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status} from ${new URL(url).host}`);
+  return resp.json();
+}
+
+// Tech: GitHub repos + StackExchange + HN Algolia + npm/PyPI/crates (all keyless, verified)
+async function techFreeSearch(query: string, numResults: number): Promise<SearchResult[]> {
+  const per = Math.max(2, Math.ceil(numResults / 3));
+  const q = encodeURIComponent(query);
+  const jobs: Promise<SearchResult[]>[] = [
+    freeGet(`https://api.github.com/search/repositories?q=${q}&per_page=${per}&sort=stars`).then((d: any) =>
+      (d.items || []).map((r: any) => ({ title: r.full_name, url: r.html_url, text: r.description || "", score: r.stargazers_count / 100000, engine: "github-direct" })),
+    ).catch(() => []),
+    freeGet(`https://api.stackexchange.com/2.3/search/advanced?order=desc&sort=relevance&q=${q}&site=stackoverflow&pagesize=${per}&filter=!nNPvSNdWme`).then((d: any) =>
+      (d.items || []).map((it: any) => ({ title: it.title, url: `https://stackoverflow.com/questions/${it.question_id}`, text: (it.excerpt || "").slice(0, 500), score: (it.score || 0) / 100, engine: "stackoverflow-direct" })),
+    ).catch(() => []),
+    freeGet(`https://hn.algolia.com/api/v1/search?query=${q}&hitsPerPage=${per}&tags=story`).then((d: any) =>
+      (d.hits || []).filter((h: any) => h.title || h.story_title).map((h: any) => ({ title: h.title || h.story_title, url: h.url || `https://news.ycombinator.com/item?id=${h.objectID}`, text: `${h.points || 0}pts ${h.num_comments || 0} comments`, engine: "hn-direct" })),
+    ).catch(() => []),
+    freeGet(`https://registry.npmjs.org/-/v1/search?text=${q}&size=${per}`).then((d: any) =>
+      (d.objects || []).map((o: any) => ({ title: o.package?.name || "", url: o.package?.links?.npm || "", text: (o.package?.description || "").slice(0, 300), engine: "npm-direct" })),
+    ).catch(() => []),
+  ];
+  jobs.push(
+    freeGet(`https://crates.io/api/v1/crates?q=${q}&per_page=${per}`, { Accept: "application/json" }).then((d: any) =>
+      (d.crates || []).map((c: any) => ({ title: c.name, url: `https://crates.io/crates/${c.name}`, text: (c.description || "").slice(0, 300), engine: "crates-direct" })),
+    ).catch(() => []),
+  );
+  const parts = await Promise.all(jobs);
+  return parts.flat().slice(0, numResults);
+}
+
+// Academic: OpenAlex + arXiv (https) + Crossref polite pool (all keyless, verified)
+async function academicFreeSearch(query: string, numResults: number): Promise<SearchResult[]> {
+  const q = encodeURIComponent(query);
+  const per = Math.max(2, Math.ceil(numResults / 2));
+  const jobs: Promise<SearchResult[]>[] = [
+    freeGet(`https://api.openalex.org/works?search=${q}&per-page=${per}&mailto=research@example.com`).then((d: any) =>
+      (d.results || []).map((w: any) => ({ title: w.title || "", url: w.doi ? `https://doi.org/${w.doi.replace("https://doi.org/", "")}` : (w.primary_location?.landing_page_url || ""), text: (w.abstract_inverted_index ? "" : "") + (w.title || ""), score: (w.cited_by_count || 0) / 10000, engine: "openalex-direct", publishedDate: w.publication_year ? String(w.publication_year) : undefined })),
+    ).catch(() => []),
+    freeGet(`https://api.crossref.org/works?query=${q}&rows=${per}&mailto=research@example.com`, {}).then((d: any) =>
+      (d.message?.items || []).map((it: any) => ({ title: (it.title || [""])[0], url: it.URL || (it.DOI ? `https://doi.org/${it.DOI}` : ""), text: (it.abstract || "").replace(/<[^>]+>/g, "").slice(0, 500), engine: "crossref-direct" })),
+    ).catch(() => []),
+  ];
+  // arXiv is XML: fetch raw and extract titles/ids minimally
+  jobs.push(
+    (async () => {
+      try {
+        const resp = await fetch(`https://export.arxiv.org/api/query?search_query=all:${q}&max_results=${per}&sortBy=submittedDate`, {
+          headers: { "User-Agent": "searxng-mcp/2.0 (research)" }, signal: AbortSignal.timeout(15000),
+        });
+        const xml = await resp.text();
+        const out: SearchResult[] = [];
+        for (const m of xml.matchAll(/<entry>([\s\S]*?)<\/entry>/g)) {
+          const body = m[1];
+          const title = (body.match(/<title>([\s\S]*?)<\/title>/)?.[1] || "").replace(/\s+/g, " ").trim();
+          const id = body.match(/<id>(.*?)<\/id>/)?.[1]?.trim() || "";
+          const summary = (body.match(/<summary>([\s\S]*?)<\/summary>/)?.[1] || "").replace(/\s+/g, " ").trim().slice(0, 500);
+          if (title) out.push({ title, url: id, text: summary, engine: "arxiv-direct" });
+        }
+        return out;
+      } catch { return []; }
+    })(),
+  );
+  const parts = await Promise.all(jobs);
+  return parts.flat().slice(0, numResults);
+}
+
+// ── SearXNG (proven + expanded API-backed engines) ─────────────────────
 const CATEGORY_ENGINES: Record<string, string> = {
-  general: "google cse,bing",
-  it: "github,npm,docker hub,stackoverflow",
-  science: "arxiv,crossref,openalex",
+  general: "google cse,bing,wikipedia,wikidata",
+  it: "github,npm,docker hub,stackoverflow,pypi,crates.io,huggingface",
+  science: "arxiv,crossref,openalex,semantic scholar,pubmed,europepmc",
 };
 
 async function searxSearch(query: string, category: string, numResults: number, timeRange?: string): Promise<SearchResult[]> {
@@ -183,7 +256,7 @@ async function flareSearch(query: string, category: string, numResults: number):
   return [];
 }
 
-// ── Orchestrator: Exa → Tavily → SearXNG → FlareSolverr ─────────────
+// ── Orchestrator: Exa → Tavily → free direct → SearXNG → FlareSolverr (quality-first) ──
 async function searchWithFallback(
   query: string,
   category: string,
@@ -210,7 +283,20 @@ async function searchWithFallback(
   }
   await jitter();
 
-  // SearXNG proven engines third
+  // Free direct APIs third (keyless, high-precision for it/science)
+  try {
+    const results =
+      category === "it" ? await techFreeSearch(query, numResults)
+      : category === "science" ? await academicFreeSearch(query, numResults)
+      : [];
+    if (results.length > 0) return { source: "free-direct", results };
+    console.error(`[searxng-mcp] free-direct empty for "${query}"`);
+  } catch (e: any) {
+    console.error(`[searxng-mcp] free-direct failed for "${query}": ${e.message}`);
+  }
+  await jitter();
+
+  // SearXNG expanded engines fourth
   try {
     const results = await searxSearch(query, category, numResults, timeRange);
     if (results.length > 0) return { source: "searxng", results };

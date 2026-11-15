@@ -7,13 +7,21 @@ use_default_settings:
     keep_only:
       - google cse
       - bing
+      - wikipedia
+      - wikidata
       - github
       - npm
       - docker hub
       - stackoverflow
+      - pypi
+      - crates.io
+      - huggingface
       - arxiv
       - crossref
       - openalex
+      - semantic scholar
+      - pubmed
+      - europepmc
 
 server:
   port: 8088
@@ -51,6 +59,20 @@ engines:
     weight: 0.5
     disabled: false
 
+  - name: wikipedia
+    engine: wikipedia
+    shortcut: wp
+    categories: general
+    weight: 0.8
+    disabled: false
+
+  - name: wikidata
+    engine: wikidata
+    shortcut: wd
+    categories: general
+    weight: 0.6
+    disabled: false
+
   # ── TECHNICAL (tech_search fallback) ───────────────────────────
   - name: github
     engine: github
@@ -81,6 +103,27 @@ engines:
     weight: 1.0
     disabled: false
 
+  - name: pypi
+    engine: pypi
+    shortcut: pypi
+    categories: it
+    weight: 0.7
+    disabled: false
+
+  - name: crates.io
+    engine: crates
+    shortcut: crates
+    categories: it
+    weight: 0.6
+    disabled: false
+
+  - name: huggingface
+    engine: huggingface
+    shortcut: hf
+    categories: it
+    weight: 0.6
+    disabled: false
+
   # ── ACADEMIC (academic_search fallback) ────────────────────────
   - name: arxiv
     engine: arxiv
@@ -101,4 +144,25 @@ engines:
     shortcut: oa
     categories: science
     weight: 0.8
+    disabled: false
+
+  - name: semantic scholar
+    engine: semantic_scholar
+    shortcut: se
+    categories: science
+    weight: 0.9
+    disabled: false
+
+  - name: pubmed
+    engine: pubmed
+    shortcut: pub
+    categories: science
+    weight: 0.6
+    disabled: false
+
+  - name: europepmc
+    engine: europepmc
+    shortcut: epmc
+    categories: science
+    weight: 0.6
     disabled: false
