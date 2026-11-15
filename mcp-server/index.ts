@@ -348,7 +348,7 @@ const commonParams = {
 
 server.tool(
   "web_search",
-  "General web search for broad discovery: blog posts, docs, discussions, news. Backed by Exa (primary), Tavily (fallback), then SearXNG (Google CSE/Bing). Use for 'what is X', landscape surveys, finding links. Not for code or papers — use tech_search / academic_search.",
+  "General web search for broad discovery: blog posts, docs, discussions, news. Backed by Exa (primary), Tavily (fallback), then SearXNG (Google CSE/Bing). Use for 'what is X', landscape surveys, finding links. Not for academic papers — use academic_search.",
   commonParams,
   async ({ query, numResults, timeRange }) => {
     return enqueue(async () => {
@@ -361,20 +361,21 @@ server.tool(
   },
 );
 
-server.tool(
-  "tech_search",
-  "Technical and code research: search GitHub repos/issues, npm packages, Docker Hub, Stack Overflow. Backed by Exa (primary), Tavily (fallback), then SearXNG. Use for implementation questions, finding libraries, repo discovery, community consensus on tools. Not for general info or academic papers.",
-  commonParams,
-  async ({ query, numResults, timeRange }) => {
-    return enqueue(async () => {
-      await jitter();
-      const start = performance.now();
-      const { source, results } = await searchWithFallback(query, "it", numResults, timeRange);
-      console.error(`[searxng-mcp] tech_search "${query}" source=${source} results=${results.length} time=${Math.round(performance.now() - start)}ms`);
-      return { content: [{ type: "text", text: buildMcpText(source, query, results, numResults) }] };
-    });
-  },
-);
+// tech_search DISABLED 2026-11-15: tech lane folded into web_search (quality-first).
+// server.tool(
+//   "tech_search",
+//   "Technical and code research: search GitHub repos/issues, npm packages, Docker Hub, Stack Overflow. Backed by Exa (primary), Tavily (fallback), then SearXNG. Use for implementation questions, finding libraries, repo discovery, community consensus on tools. Not for general info or academic papers.",
+//   commonParams,
+//   async ({ query, numResults, timeRange }) => {
+//     return enqueue(async () => {
+//       await jitter();
+//       const start = performance.now();
+//       const { source, results } = await searchWithFallback(query, "it", numResults, timeRange);
+//       console.error(`[searxng-mcp] tech_search "${query}" source=${source} results=${results.length} time=${Math.round(performance.now() - start)}ms`);
+//       return { content: [{ type: "text", text: buildMcpText(source, query, results, numResults) }] };
+//     });
+//   },
+// );
 
 server.tool(
   "academic_search",
